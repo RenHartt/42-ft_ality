@@ -1,0 +1,5 @@
+Claw Slam : [BP]
+Saibot Blast : [BP], [FP]
+Uppercut : down, [FP]
+Left : left
+Right : right
