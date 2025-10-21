@@ -1,63 +1,45 @@
-let alphanumeric : string list =
-  ["q"; "w"; "e"; "r"; "t"; "y"; "u"; "i"; "o"; "p";
-   "a"; "s"; "d"; "f"; "g"; "h"; "j"; "k"; "l";
-   "z"; "x"; "c"; "v"; "b"; "n"; "m";
-   "0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"]
+(* src/mapping.ml *)
 
-let arrow : string list = ["left"; "right"; "up"; "down"]
+type key = int
+type binding = key * Grammar.touch
+type t = binding list
 
-let extract_all_tokens (grammar_entries : (string * string list) list) : string list =
-  let rec collect accumulated = function
-    | [] -> List.rev accumulated
-    | (_rule_name, tokens) :: remaining ->
-        collect (List.rev_append tokens accumulated) remaining
+let keys : key list =
+  [
+    Tsdl.Sdl.Scancode.left; Tsdl.Sdl.Scancode.right;
+    Tsdl.Sdl.Scancode.up;   Tsdl.Sdl.Scancode.down;
+    Tsdl.Sdl.Scancode.a; Tsdl.Sdl.Scancode.z; Tsdl.Sdl.Scancode.e;
+    Tsdl.Sdl.Scancode.r; Tsdl.Sdl.Scancode.t;
+    Tsdl.Sdl.Scancode.q; Tsdl.Sdl.Scancode.s; Tsdl.Sdl.Scancode.d;
+    Tsdl.Sdl.Scancode.f; Tsdl.Sdl.Scancode.g;
+    Tsdl.Sdl.Scancode.w; Tsdl.Sdl.Scancode.x; Tsdl.Sdl.Scancode.c;
+    Tsdl.Sdl.Scancode.v; Tsdl.Sdl.Scancode.b;
+    Tsdl.Sdl.Scancode.k1; Tsdl.Sdl.Scancode.k2; Tsdl.Sdl.Scancode.k3;
+    Tsdl.Sdl.Scancode.k4; Tsdl.Sdl.Scancode.k5;
+  ]
+
+let make (g : Grammar.t) : (t, string) result =
+  let rec pair acc ks ins =
+    match ks, ins with
+    | _, [] -> Ok (List.rev acc)
+    | [], _ -> Error "not enough SDL scancodes for inputs"
+    | k::kt, t::tt -> pair ((k, t) :: acc) kt tt
   in
-  collect [] grammar_entries
+  pair [] keys g.Grammar.inputs
 
-let uniq (words : string list) : string list =
-  let rec filter_unique seen = function
-    | [] -> List.rev seen
-    | word :: rest ->
-        if List.exists ((=) word) seen then
-          filter_unique seen rest
-        else
-          filter_unique (word :: seen) rest
-  in
-  filter_unique [] words
+let key_name (k : key) : string =
+  Tsdl.Sdl.get_scancode_name k
 
-let is_arrow (token : string) : bool =
-  token = "left" || token = "right" || token = "up" || token = "down"
-
-let map_key_to_token
-    (letter_keys : string list)
-    (arrow : string list)
-    (tokens : string list)
-    : (string * string) list =
-  let rec associate accumulated letters arrows remaining_tokens =
-    match remaining_tokens with
-    | [] -> List.rev accumulated
-    | token :: rest ->
-        if is_arrow token then
-          (match arrows with
-           | [] -> invalid_arg "No more arrow keys available for mapping"
-           | arrow :: remaining_arrows ->
-               associate ((arrow, token) :: accumulated) letters remaining_arrows rest)
-        else
-          (match letters with
-           | [] -> invalid_arg "No more alphanumeric keys available for mapping"
-           | letter :: remaining_letters ->
-               associate ((letter, token) :: accumulated) remaining_letters arrows rest)
-  in
-  associate [] letter_keys arrow tokens
-
-let make (grammar_entries : (string * string list) list) : (string * string) list =
-  let tokens =
-    grammar_entries |> extract_all_tokens |> uniq
-  in
-  map_key_to_token alphanumeric arrow tokens
-
-let print (mapping_table : (string * string) list) : unit =
-  print_endline "Key mappings:";
+let print (m : t) : unit =
+  print_endline "SDL2 Key mappings (scancodes):";
   List.iter
-    (fun (key, token) -> print_endline (key ^ " -> " ^ token))
-    mapping_table
+    (fun (k, t) -> Printf.printf "  %s -> %s (%s)\n"
+      (key_name k) t.Grammar.label t.token)
+    m
+
+let find (m : t) (k : key) : Grammar.touch option =
+  let rec go = function
+    | [] -> None
+    | (kk, t) :: rest -> if kk = k then Some t else go rest
+  in
+  go m

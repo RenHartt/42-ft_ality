@@ -1,22 +1,19 @@
-let usage_msg =
-    "Usage: ./ft_ality <grammar_file>\n"
+(* src/main.ml *)
 
 let () =
   if Array.length Sys.argv < 2 then (
-    print_endline usage_msg;
+    print_endline "Usage: ./ft_ality <grammar_file>";
     exit 1
   );
-
-  let filename = Sys.argv.(1) in
-  let combos = Grammar.load filename in
-  let mapping = Mapping.make combos in
-
-  print_endline "Loaded grammar :";
-  List.iter
-    (fun (name, tokens) ->
-      print_endline ("[" ^ name ^ "] -> " ^ String.concat " , " tokens))
-    combos;
-
-  print_endline "------";
-
-  Mapping.print mapping;
+  let file = Sys.argv.(1) in
+  match Grammar.parse file with
+  | Error e -> prerr_endline ("Parse error: " ^ e); exit 1
+  | Ok g ->
+      Grammar.print g;
+      print_endline "------";
+      (match Mapping.make g with
+       | Error e -> prerr_endline ("Mapping error: " ^ e); exit 1
+       | Ok map ->
+           match Automaton.build g with
+           | Error e -> prerr_endline ("Automaton error: " ^ e); exit 1
+           | Ok a -> Game_loop.run a map)

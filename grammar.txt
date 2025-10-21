@@ -1,5 +1,17 @@
+# inputs
 Left : left
 Right : right
-Claw Slam : [BP]
+Up : up
+Down : down
+Front Punch : [FP]
+Back Punch : [BP]
+Front Kick : [FK]
+Back Kick : [BK]
+Block : [BL]
+
+# moves
 Uppercut : down, [FP]
+Shadow Kick : left, [FK]
+Flying Punch : up, [FP]
 Saibot Blast : [BP], [FP]
+Roundhouse : [BK], [FK]
