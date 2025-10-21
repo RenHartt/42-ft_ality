@@ -9,8 +9,6 @@ let () =
   match Grammar.parse file with
   | Error e -> prerr_endline ("Parse error: " ^ e); exit 1
   | Ok g ->
-      Grammar.print g;
-      print_endline "------";
       (match Mapping.make g with
        | Error e -> prerr_endline ("Mapping error: " ^ e); exit 1
        | Ok map ->

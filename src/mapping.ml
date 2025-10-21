@@ -38,11 +38,12 @@ let key_name (k : key) : string =
   Tsdl.Sdl.get_scancode_name k
 
 let print (m : t) : unit =
-  print_endline "Key mappings :";
+  print_endline "Key mappings:";
   List.iter
-    (fun (k, t) -> Printf.printf "  %s -> %s (%s)\n"
-      (key_name k) t.Grammar.label t.token)
-    m
+    (fun (k, t) ->
+      Printf.printf "%s -> %s\n" (key_name k) t.Grammar.raw)
+    m;
+  print_endline "----------------------"
 
 let find (m : t) (k : key) : Grammar.touch option =
   let rec go = function

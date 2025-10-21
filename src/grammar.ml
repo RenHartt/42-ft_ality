@@ -1,21 +1,21 @@
 (* src/grammar.ml *)
 
 type token = string
-type touch = { label : string; token : token }
+type touch = { label : string; token : token; raw : string }
 type combo = { move : string; seq : touch list }
 type t = { inputs : touch list; moves : combo list }
 
 let trim s = String.trim s
 let lower s = String.lowercase_ascii s
 
-let normalize_token s =
+let normalize_token_keep s =
   let s = trim s in
   let n = String.length s in
   if s = "" then Error "empty token"
   else if n >= 3 && s.[0] = '[' && s.[n - 1] = ']' then
-    Ok (lower (String.sub s 1 (n - 2)))
+    Ok (s, lower (String.sub s 1 (n - 2)))
   else
-    Ok (lower s)
+    Ok (s, lower s)
 
 let split_once_colon s =
   match String.index_opt s ':' with
@@ -40,7 +40,10 @@ let parse_input_line l =
   | Error e -> Error e
   | Ok (label, rhs) ->
       if String.contains rhs ',' then Error "single token expected"
-      else normalize_token rhs |> Result.map (fun tok -> { label; token = tok })
+      else
+        match normalize_token_keep rhs with
+        | Error e -> Error e
+        | Ok (raw, tok) -> Ok { label; token = tok; raw }
 
 let parse_move_line inputs l =
   match split_once_colon l with
@@ -52,9 +55,9 @@ let parse_move_line inputs l =
         let rec to_seq acc = function
           | [] -> Ok (List.rev acc)
           | x :: xs -> (
-              match normalize_token x with
+              match normalize_token_keep x with
               | Error e -> Error e
-              | Ok tok -> (
+              | Ok (raw, tok) -> (
                   match find_touch_by_token inputs tok with
                   | None -> Error ("unknown token '" ^ tok ^ "'")
                   | Some t -> to_seq (t :: acc) xs))
@@ -114,7 +117,7 @@ let parse file : (t, string) result =
 
 let print g =
   print_endline "# inputs";
-  List.iter (fun t -> Printf.printf "- %s : %s\n" t.label t.token) g.inputs;
+  List.iter (fun t -> Printf.printf "- %s : %s\n" t.label t.raw) g.inputs;
   print_endline "\n# moves";
   List.iter
     (fun c ->
