@@ -33,13 +33,13 @@ let show_bmp (w:Tsdl.Sdl.window) (path:string) : unit =
            end);
       Tsdl.Sdl.free_surface img
 
-
 let handle_key (w:Tsdl.Sdl.window) (a:Automaton.t) (map:Mapping.t) (st:Automaton.state) (sc:int)
   : Automaton.state =
   match Mapping.find map sc with
   | None -> st
   | Some t ->
       Printf.printf "Pressed: %s (%s)\n%!" t.Grammar.label t.token;
+      show_bmp w "data/black_screen.bmp";
       let next =
         match Automaton.step a st t.token with
         | Some s -> Some s

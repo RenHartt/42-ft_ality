@@ -19,9 +19,9 @@ else
   EXEEXT :=
 endif
 
-OCAMLC := ocamlfind ocamlc
+OCAMLC     := ocamlfind ocamlc
 OCAMLFLAGS := -g -bin-annot -I $(SRC_DIR) -I $(BUILD_DIR) -package tsdl
-LINKFLAGS := -package tsdl -linkpkg
+LINKFLAGS  := -package tsdl -linkpkg
 
 MKDIR_P := mkdir -p
 RM      := rm -f
