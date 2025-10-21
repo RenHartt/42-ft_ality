@@ -10,8 +10,8 @@ Back Kick : [BK]
 Block : [BL]
 
 # moves
-Uppercut : down, [FP]
-Shadow Kick : left, [FK]
+Uppercut : down, down
+Shadow Kick : down, down, down
 Flying Punch : up, [FP]
 Saibot Blast : [BP], [FP]
 Roundhouse : [BK], [FK]

@@ -115,6 +115,7 @@ let parse file : (t, string) result =
   with Sys_error _ ->
     Error ("cannot open file: " ^ file)
 
+(*Utils print parsed grammar*)
 let print g =
   print_endline "# inputs";
   List.iter (fun t -> Printf.printf "- %s : %s\n" t.label t.raw) g.inputs;

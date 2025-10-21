@@ -67,4 +67,3 @@ let build (g:Grammar.t) : (t, string) result =
   insert_all empty g.Grammar.moves
 
   let start_state (a:t) : state = a.start
-

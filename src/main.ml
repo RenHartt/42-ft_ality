@@ -5,6 +5,7 @@ let () =
     print_endline "Usage: ./ft_ality <grammar_file>";
     exit 1
   );
+  
   let file = Sys.argv.(1) in
   match Grammar.parse file with
   | Error e -> prerr_endline ("Parse error: " ^ e); exit 1
