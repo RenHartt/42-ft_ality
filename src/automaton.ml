@@ -1,5 +1,3 @@
-(* src/automaton.ml *)
-
 type state = int
 type token = string
 
@@ -15,55 +13,62 @@ type t = {
 
 let empty : t = { start = 0; delta = []; finals = []; max_st = 0 }
 
-let rec assoc_next st tok = function
+let rec find_transition (state : state) (token : token) = function
   | [] -> None
-  | (a,b,c)::xs ->
-      if a = st && b = tok then Some c else assoc_next st tok xs
+  | (src, tok, dst) :: rest ->
+      if src = state && tok = token
+      then Some dst
+      else find_transition state token rest
 
-let rec add_delta st tok nxt (d:delta) =
-  match assoc_next st tok d with
+let add_transition (state : state) (token : token) (next_state : state) (d : delta) : delta =
+  match find_transition state token d with
   | Some _ -> d
-  | None   -> (st, tok, nxt) :: d
+  | None -> (state, token, next_state) :: d
 
-let rec add_final st name (f:finals) =
+let rec add_final_label (state : state) (name : string) (f : finals) : finals =
   match f with
-  | [] -> [ (st, [name]) ]
-  | (q, lst) :: xs ->
-      if q = st then (q, (if List.mem name lst then lst else name::lst)) :: xs
-      else (q, lst) :: add_final st name xs
+  | [] -> [ (state, [name]) ]
+  | (q, labels) :: rest ->
+      if q = state then
+        let labels' = if List.mem name labels then labels else name :: labels in
+        (q, labels') :: rest
+      else
+        (q, labels) :: add_final_label state name rest
 
-let step (a:t) (st:state) (tok:token) : state option =
-  assoc_next st tok a.delta
+let step (automaton : t) (state : state) (token : token) : state option =
+  find_transition state token automaton.delta
 
-let finals_of (a:t) (st:state) : string list =
-  let rec go = function
+let finals_of (automaton : t) (state : state) : string list =
+  let rec lookup = function
     | [] -> []
-    | (q, lst) :: xs -> if q = st then lst else go xs
+    | (q, labels) :: rest -> if q = state then labels else lookup rest
   in
-  go a.finals
+  lookup automaton.finals
 
-let insert_seq (a:t) (name:string) (seq:token list) : t =
-  let rec walk st max_st delta = function
+let insert_sequence (automaton : t) (move_name : string) (tokens : token list) : t =
+  let rec walk state max_state delta = function
     | [] ->
-        { a with delta; finals = add_final st name a.finals; max_st = max a.max_st max_st }
-    | tok :: rest ->
-        match assoc_next st tok delta with
-        | Some nxt ->
-            walk nxt max_st delta rest
+        { automaton with
+          delta;
+          finals = add_final_label state move_name automaton.finals;
+          max_st = if max_state > automaton.max_st then max_state else automaton.max_st
+        }
+    | token :: remaining -> (
+        match find_transition state token delta with
+        | Some next_state ->
+            walk next_state max_state delta remaining
         | None ->
-            let nxt = max_st + 1 in
-            let delta' = add_delta st tok nxt delta in
-            walk nxt nxt delta' rest
+            let next_state = max_state + 1 in
+            let delta' = add_transition state token next_state delta in
+            walk next_state next_state delta' remaining )
   in
-  walk a.start a.max_st a.delta seq
+  walk automaton.start automaton.max_st automaton.delta tokens
 
-let build (g:Grammar.t) : (t, string) result =
+let build (g : Grammar.t) : t =
   let rec insert_all acc = function
-    | [] -> Ok acc
-    | c :: cs ->
-        let seq = List.map (fun (t:Grammar.touch) -> t.token) c.Grammar.seq in
-        insert_all (insert_seq acc c.Grammar.move seq) cs
+    | [] -> acc
+    | combo :: rest ->
+        let tokens = List.map (fun (t : Grammar.touch) -> t.token) combo.Grammar.seq in
+        insert_all (insert_sequence acc combo.Grammar.move tokens) rest
   in
   insert_all empty g.Grammar.moves
-
-  let start_state (a:t) : state = a.start

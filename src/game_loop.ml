@@ -1,88 +1,102 @@
-(* src/game_loop.ml *)
+let window_width = 640
+let window_height = 360
+let window_title = "ft_ality"
 
-let init_window () =
+let bmp_black_screen = "data/black_screen.bmp"
+let bmp_fatality = "data/fatality.bmp"
+
+let create_window () =
   match Tsdl.Sdl.init Tsdl.Sdl.Init.video with
   | Error (`Msg e) ->
       prerr_endline ("SDL init error: " ^ e); exit 1
   | Ok () ->
       match Tsdl.Sdl.create_window
-              ~w:640 ~h:360 "ft_ality (inputs test)"
+              ~w:window_width ~h:window_height window_title
               Tsdl.Sdl.Window.windowed with
       | Error (`Msg e) ->
           prerr_endline ("SDL window error: " ^ e);
           Tsdl.Sdl.quit (); exit 1
       | Ok w -> w
 
-let pressed sc =
-  let ks = Tsdl.Sdl.get_keyboard_state () in
-  Bigarray.Array1.get ks sc <> 0
+let is_key_pressed scancode =
+  let keyboard_state = Tsdl.Sdl.get_keyboard_state () in
+  Bigarray.Array1.get keyboard_state scancode <> 0
 
-let show_bmp (w:Tsdl.Sdl.window) (path:string) : unit =
+let render_bmp (window : Tsdl.Sdl.window) (path : string) : unit =
   match Tsdl.Sdl.load_bmp path with
   | Error (`Msg e) ->
       prerr_endline ("BMP load error: " ^ e)
-  | Ok img ->
-      (match Tsdl.Sdl.get_window_surface w with
+  | Ok image ->
+      let finally () = Tsdl.Sdl.free_surface image in
+      (match Tsdl.Sdl.get_window_surface window with
        | Error (`Msg e) ->
-           prerr_endline ("Window surface error: " ^ e)
-       | Ok win_surf ->
-           begin match Tsdl.Sdl.blit_surface img None win_surf None with
-           | Error (`Msg e) -> prerr_endline ("Blit error: " ^ e)
+           prerr_endline ("Window surface error: " ^ e); finally ()
+       | Ok window_surface -> (
+           match Tsdl.Sdl.blit_surface image None window_surface None with
+           | Error (`Msg e) ->
+               prerr_endline ("Blit error: " ^ e); finally ()
            | Ok () ->
-               ignore (Tsdl.Sdl.update_window_surface w)
-           end);
-      Tsdl.Sdl.free_surface img
+               ignore (Tsdl.Sdl.update_window_surface window);
+               finally ()
+         )
+      )
 
-let handle_key (w : Tsdl.Sdl.window) (a : Automaton.t) (map : Mapping.t) (st : Automaton.state) (seq : string list) (sc : int)
-  : Automaton.state * (string list) =
-  match Mapping.find map sc with
+let advance_automaton (automaton : Automaton.t) (state : Automaton.state) (token : string)
+  : (Automaton.state * bool) option =
+  match Automaton.step automaton state token with
+  | Some next_state -> Some (next_state, false)
   | None ->
-      (st, seq)
-  | Some t ->
-      let from_st = Automaton.step a st t.token in
-      let next, started_from_start =
-        match from_st with
-        | Some s -> (Some s, false)
-        | None   -> (Automaton.step a a.Automaton.start t.token, true)
-      in
-      match next with
-      | None ->
-          (a.Automaton.start, [])
-      | Some s ->
-          let seq' =
-            if started_from_start then [t.raw] else seq @ [t.raw]
-          in
-          let line = String.concat ", " seq' in
-          Printf.printf "%s\n%!" line;
-          show_bmp w "data/black_screen.bmp";
-          let finals = Automaton.finals_of a s in
-          match finals with
-          | [] ->
-              (s, seq')
-          | names ->
-              List.iter (fun n -> Printf.printf "%s !!\n%!" n) names;
-              show_bmp w "data/fatality.bmp";
-              (s, seq')
+      (match Automaton.step automaton automaton.Automaton.start token with
+       | Some next_state -> Some (next_state, true)
+       | None -> None)
 
-let rec loop (w:Tsdl.Sdl.window) (a:Automaton.t) (map:Mapping.t) (st:Automaton.state) (seq:string list) (ev:Tsdl.Sdl.event) =
-  match Tsdl.Sdl.wait_event (Some ev) with
-  | Error (`Msg _) -> loop w a map st seq ev
+let update_sequence_labels (sequence : string list) (raw_label : string) (restarted : bool)
+  : string list =
+  if restarted then [raw_label] else sequence @ [raw_label]
+
+let handle_key_event (window : Tsdl.Sdl.window) (automaton : Automaton.t) (mapping : Mapping.t) (state : Automaton.state) (sequence : string list) (scancode : int)
+  : Automaton.state * string list =
+  match Mapping.find mapping scancode with
+  | None -> (state, sequence)
+  | Some touch ->
+      let print_and_flash s = Printf.printf "%s\n%!" s; render_bmp window bmp_black_screen in
+      match advance_automaton automaton state touch.token with
+      | None ->
+          print_and_flash touch.raw;
+          (automaton.Automaton.start, [])
+      | Some (next_state, restarted) ->
+          let sequence' = if restarted then [touch.raw] else sequence @ [touch.raw] in
+          print_and_flash (String.concat ", " sequence');
+          (match Automaton.finals_of automaton next_state with
+           | [] -> ()
+           | final_moves ->
+               List.iter (fun name -> Printf.printf "%s !!\n%!" name) final_moves;
+               render_bmp window bmp_fatality);
+          (next_state, sequence')
+
+let rec event_loop (window : Tsdl.Sdl.window) (automaton : Automaton.t) (mapping : Mapping.t) (state : Automaton.state) (sequence : string list) (event : Tsdl.Sdl.event)
+  : unit =
+  match Tsdl.Sdl.wait_event (Some event) with
+  | Error (`Msg _) ->
+      event_loop window automaton mapping state sequence event
   | Ok () ->
-      let typ = Tsdl.Sdl.Event.(enum (get ev typ)) in
-      match typ with
+      let event_type = Tsdl.Sdl.Event.(enum (get event typ)) in
+      match event_type with
       | `Quit -> ()
       | `Key_down ->
-          if pressed Tsdl.Sdl.Scancode.escape then ()
+          if is_key_pressed Tsdl.Sdl.Scancode.escape then ()
           else
-            let sc = Tsdl.Sdl.Event.(get ev keyboard_scancode) in
-            let (st', seq') = handle_key w a map st seq sc in
-            loop w a map st' seq' ev
-      | _ -> loop w a map st seq ev
+            let scancode = Tsdl.Sdl.Event.(get event keyboard_scancode) in
+            let state', sequence' =
+              handle_key_event window automaton mapping state sequence scancode
+            in
+            event_loop window automaton mapping state' sequence' event
+      | _ ->
+          event_loop window automaton mapping state sequence event
 
-let run (a:Automaton.t) (map:Mapping.t) : unit =
-  let w = init_window () in
-  Mapping.print map;
-  let ev = Tsdl.Sdl.Event.create () in
-  loop w a map a.Automaton.start [] ev;
-  Tsdl.Sdl.destroy_window w;
+let run (a : Automaton.t) (map : Mapping.t) : unit =
+  let window = create_window () in
+  let event = Tsdl.Sdl.Event.create () in
+  event_loop window a map a.Automaton.start [] event;
+  Tsdl.Sdl.destroy_window window;
   Tsdl.Sdl.quit ()
