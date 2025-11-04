@@ -35,7 +35,7 @@ let render_bmp (window : Tsdl.Sdl.window) (path : string) : unit =
        | Error (`Msg e) ->
            prerr_endline ("Window surface error: " ^ e); finally ()
        | Ok window_surface -> (
-           match Tsdl.Sdl.blit_surface image None window_surface None with
+           match Tsdl.Sdl.blit_surface ~src:image None ~dst:window_surface None with
            | Error (`Msg e) ->
                prerr_endline ("Blit error: " ^ e); finally ()
            | Ok () ->
