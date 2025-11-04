@@ -1,3 +1,7 @@
+let red s = Printf.sprintf "\027[31m%s\027[0m" s
+let green s = Printf.sprintf "\027[32m%s\027[0m" s
+let yellow s = Printf.sprintf "\027[33m%s\027[0m" s
+
 type state = int
 type token = string
 
@@ -9,9 +13,10 @@ type t = {
   delta  : delta;
   finals : finals;
   max_st : state;
+  debug  : bool;
 }
 
-let empty : t = { start = 0; delta = []; finals = []; max_st = 0 }
+let empty : t = { start = 0; delta = []; finals = []; max_st = 0; debug = false }
 
 let rec find_transition (state : state) (token : token) = function
   | [] -> None
@@ -36,12 +41,29 @@ let rec add_final_label (state : state) (name : string) (f : finals) : finals =
         (q, labels) :: add_final_label state name rest
 
 let step (automaton : t) (state : state) (token : token) : state option =
-  find_transition state token automaton.delta
+  match find_transition state token automaton.delta with
+  | Some next_state ->
+      if automaton.debug then
+        Printf.printf "%s\n%!"
+          (yellow (Printf.sprintf "State %d, \"%s\" -> State %d" state token next_state));
+      Some next_state
+  | None ->
+      if automaton.debug then
+        Printf.printf "%s\n%!"
+          (red (Printf.sprintf "State %d, \"%s\" -> [no transition] -> Reset to state %d" state token automaton.start));
+      None
 
 let finals_of (automaton : t) (state : state) : string list =
   let rec lookup = function
     | [] -> []
-    | (q, labels) :: rest -> if q = state then labels else lookup rest
+    | (q, labels) :: rest ->
+        if q = state then begin
+          if automaton.debug then
+            Printf.printf "%s\n%!"
+              (green (Printf.sprintf "Found end state for \"%s\" at: %d" (String.concat ", " labels) state));
+          labels
+        end else
+          lookup rest
   in
   lookup automaton.finals
 
@@ -64,11 +86,12 @@ let insert_sequence (automaton : t) (move_name : string) (tokens : token list) :
   in
   walk automaton.start automaton.max_st automaton.delta tokens
 
-let build (g : Grammar.t) : t =
+let build (g : Grammar.t) (debug : bool) : t =
+  let base = { empty with debug } in
   let rec insert_all acc = function
     | [] -> acc
     | combo :: rest ->
         let tokens = List.map (fun (t : Grammar.touch) -> t.token) combo.Grammar.seq in
         insert_all (insert_sequence acc combo.Grammar.move tokens) rest
   in
-  insert_all empty g.Grammar.moves
+  insert_all base g.Grammar.moves

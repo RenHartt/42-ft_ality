@@ -1,3 +1,6 @@
+let bold s = Printf.sprintf "\027[1m%s\027[0m" s
+let dark_grey s = Printf.sprintf "\027[90m%s\027[0m" s
+
 let window_width = 640
 let window_height = 360
 let window_title = "ft_ality"
@@ -44,11 +47,14 @@ let render_bmp (window : Tsdl.Sdl.window) (path : string) : unit =
 let advance_automaton (automaton : Automaton.t) (state : Automaton.state) (token : string)
   : (Automaton.state * bool) option =
   match Automaton.step automaton state token with
-  | Some next_state -> Some (next_state, false)
+  | Some s -> Some (s, false)
   | None ->
-      (match Automaton.step automaton automaton.Automaton.start token with
-       | Some next_state -> Some (next_state, true)
-       | None -> None)
+      if state = automaton.Automaton.start then
+        None
+      else
+        match Automaton.step automaton automaton.Automaton.start token with
+        | Some s -> Some (s, true)
+        | None -> None
 
 let update_sequence_labels (sequence : string list) (raw_label : string) (restarted : bool)
   : string list =
@@ -59,7 +65,7 @@ let handle_key_event (window : Tsdl.Sdl.window) (automaton : Automaton.t) (mappi
   match Mapping.find mapping scancode with
   | None -> (state, sequence)
   | Some touch ->
-      let print_and_flash s = Printf.printf "%s\n%!" s; render_bmp window bmp_black_screen in
+      let print_and_flash s = Printf.printf "%s\n%!" (dark_grey s); render_bmp window bmp_black_screen in
       match advance_automaton automaton state touch.token with
       | None ->
           print_and_flash touch.raw;
@@ -70,7 +76,7 @@ let handle_key_event (window : Tsdl.Sdl.window) (automaton : Automaton.t) (mappi
           (match Automaton.finals_of automaton next_state with
            | [] -> ()
            | final_moves ->
-               List.iter (fun name -> Printf.printf "%s !!\n%!" name) final_moves;
+               List.iter (fun name -> Printf.printf "%s\n%!" (bold (name ^ " !!"))) final_moves;
                render_bmp window bmp_fatality);
           (next_state, sequence')
 
