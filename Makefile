@@ -13,13 +13,9 @@ SOURCES := \
 CMOS := $(patsubst $(SRC_DIR)/%.ml,$(BUILD_DIR)/%.cmo,$(SOURCES))
 
 SHELL := /usr/bin/sh
-ifeq ($(OS),Windows_NT)
-  EXEEXT := .exe
-else
-  EXEEXT :=
-endif
 
-OCAMLC     := ocamlfind ocamlc
+OCAMLC     := $(shell opam var bin)/ocamlfind ocamlc
+OCAMLDEP   := $(shell opam var bin)/ocamlfind ocamldep
 OCAMLFLAGS := -g -bin-annot -I $(SRC_DIR) -I $(BUILD_DIR) -package tsdl
 LINKFLAGS  := -package tsdl -linkpkg
 
@@ -29,9 +25,9 @@ RMR     := rm -rf
 
 .PHONY: all clean fclean re deps
 
-all: $(BIN_DIR)/$(PROJECT)$(EXEEXT)
+all: $(BIN_DIR)/$(PROJECT)
 
-$(BIN_DIR)/$(PROJECT)$(EXEEXT): $(CMOS) | $(BIN_DIR)
+$(BIN_DIR)/$(PROJECT): $(CMOS) | $(BIN_DIR)
 	$(OCAMLC) $(OCAMLFLAGS) $(LINKFLAGS) -o $@ $(CMOS)
 
 $(BUILD_DIR)/%.cmo: $(SRC_DIR)/%.ml | $(BUILD_DIR)
@@ -47,10 +43,10 @@ deps: .depend
 -include .depend
 
 clean:
-	-$(RM) $(BUILD_DIR)/* $(SRC_DIR)/*~
+	-$(RM) $(BUILD_DIR)/*
 
 fclean: clean
-	-$(RM) $(BIN_DIR)/$(PROJECT)$(EXEEXT) .depend
+	-$(RM) $(BIN_DIR)/$(PROJECT) .depend
 	-$(RMR) $(BUILD_DIR) $(BIN_DIR)
 
 re: fclean all
